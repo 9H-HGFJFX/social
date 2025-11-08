@@ -1,7 +1,13 @@
 import { inject, ref } from 'vue'
 
+/**
+ * 支持的语言类型
+ */
 export type UILang = 'zh' | 'en'
 
+/**
+ * 国际化字典对象
+ */
 const dict = {
   zh: {
     brand: "Social Anti-Fake News",
@@ -35,6 +41,8 @@ const dict = {
     reporter: "记者",
     date: "时间",
     source: "来源",
+    countries: "国家",
+    peopleVoted: "人已投票",
     notFound: "该新闻不存在。",
     backHome: "返回首页",
 
@@ -102,6 +110,8 @@ const dict = {
     reporter: "Reporter",
     date: "Date",
     source: "Source",
+    countries: "Countries",
+    peopleVoted: "people voted",
     notFound: "News not found.",
     backHome: "Back to Home",
 
@@ -139,24 +149,132 @@ const dict = {
   }
 } as const
 
+/**
+ * 字典键类型，从中文字典中提取所有键
+ */
 export type DictKey = keyof typeof dict['zh']
 
+/**
+ * 国际化符号，用于在Vue应用中提供和注入国际化实例
+ */
 export const I18nSymbol = Symbol('i18n')
 
-export function createI18n() {
-  const lang = ref<UILang>('en')
-  const t = (key: DictKey, params?: Record<string, string | number>) => {
-    const table = dict[lang.value] as Record<DictKey, string>
-    const raw = table[key]
-    if (!params) return raw
-    return raw.replace(/\{(\w+)\}/g, (_, k) => String(params[k] ?? ''))
-  }
-  const setLang = (l: UILang) => { lang.value = l }
-  return { lang, t, setLang }
+/**
+ * 国际化实例接口
+ */
+interface I18nInstance {
+  /** 当前语言 */
+  lang: { value: UILang }
+  /** 翻译函数 */
+  t: (key: DictKey, params?: Record<string, string | number>) => string
+  /** 设置语言函数 */
+  setLang: (lang: UILang) => void
+  /** 可用语言列表 */
+  availableLangs: UILang[]
+  /** 获取当前字典 */
+  getDict: () => Record<DictKey, string>
 }
 
-export function useI18n() {
-  const i18n = inject<ReturnType<typeof createI18n>>(I18nSymbol)
-  if (!i18n) throw new Error('useI18n must be used within app with I18n provided')
+/**
+ * 创建国际化实例
+ * @returns 国际化实例对象
+ */
+export function createI18n(): I18nInstance {
+  // 当前使用的语言 - 强制使用英文作为默认语言
+  const lang = ref<UILang>('en')
+  
+  // 可用语言列表
+  const availableLangs: UILang[] = ['zh', 'en']
+
+  /**
+   * 翻译函数，支持参数替换
+   * @param key 翻译键
+   * @param params 可选参数对象
+   * @returns 翻译后的文本
+   */
+  const t = (key: DictKey, params?: Record<string, string | number>): string => {
+    try {
+      // 获取当前语言的字典表
+      const table = dict[lang.value] as Record<DictKey, string>
+      
+      // 获取原始文本
+      const raw = table[key]
+      
+      // 如果键不存在，返回键本身并记录警告
+      if (raw === undefined) {
+        console.warn(`翻译键不存在: ${key} (语言: ${lang.value})`)
+        return key
+      }
+      
+      // 如果没有参数，直接返回原始文本
+      if (!params) return raw
+      
+      // 执行参数替换
+      return raw.replace(/\{(\w+)\}/g, (_, k) => {
+        const value = params[k]
+        if (value === undefined) {
+          console.warn(`翻译参数缺失: ${k} (键: ${key})`)
+          return `{${k}}`
+        }
+        return String(value)
+      })
+    } catch (error) {
+      console.error(`翻译失败: ${key}`, error)
+      return key
+    }
+  }
+
+  /**
+   * 设置当前语言
+   * @param l 语言代码
+   */
+  const setLang = (l: UILang): void => {
+    try {
+      if (availableLangs.includes(l)) {
+        lang.value = l
+        console.log(`语言已切换为: ${l}`)
+        
+        // 可选：将语言设置保存到本地存储
+        try {
+          localStorage.setItem('ui_language', l)
+        } catch (error) {
+          console.warn('无法保存语言设置到本地存储:', error)
+        }
+      } else {
+        console.warn(`不支持的语言: ${l}`)
+      }
+    } catch (error) {
+      console.error(`设置语言失败: ${l}`, error)
+    }
+  }
+
+  /**
+   * 获取当前语言的字典
+   * @returns 当前语言的字典对象
+   */
+  const getDict = (): Record<DictKey, string> => {
+    return dict[lang.value] as Record<DictKey, string>
+  }
+
+  // 返回完整的国际化实例
+  return {
+    lang,
+    t,
+    setLang,
+    availableLangs,
+    getDict
+  }
+}
+
+/**
+ * 组合式API钩子：使用国际化功能
+ * @returns 国际化实例
+ * @throws 当没有提供I18n实例时抛出错误
+ */
+export function useI18n(): I18nInstance {
+  const i18n = inject<I18nInstance>(I18nSymbol)
+  if (!i18n) {
+    throw new Error('useI18n必须在已提供I18n的应用内使用')
+  }
   return i18n
 }

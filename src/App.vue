@@ -14,8 +14,8 @@
         </select>
         <span style="margin-left:12px"></span>
         <RouterLink to="/" active-class="active" exact>{{ t('nav_home') }}</RouterLink>
-        <RouterLink to="/report" active-class="active">{{ t('nav_report') }}</RouterLink>
         <RouterLink to="/import" active-class="active">{{ t('nav_import') }}</RouterLink>
+        <RouterLink to="/report" active-class="active">{{ t('nav_report') }}</RouterLink>
       </nav>
     </header>
     <main class="main">
