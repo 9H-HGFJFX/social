@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory, type NavigationGuardNext, type RouteLocationNormalized } from 'vue-router'
+import { createRouter, createWebHashHistory, type NavigationGuardNext, type RouteLocationNormalized } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
 import Home from './pages/Home.vue'
 import NewsDetail from './pages/NewsDetail.vue'
@@ -87,7 +87,7 @@ const routes: CustomRouteRecordRaw[] = [
  * 创建路由实例
  */
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHashHistory(),
   routes,
   linkActiveClass: 'active',
   linkExactActiveClass: 'active',

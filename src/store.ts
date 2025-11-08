@@ -409,8 +409,8 @@ export function createStore() {
       // 数据验证：确保数组元素包含必要字段
       if (Array.isArray(parsed)) {
         return parsed.filter((v) => 
-          typeof (v as any).newsId === 'number' && 
-          ['fake', 'not_fake'].includes((v as any).choice)
+          typeof (v as Vote).newsId === 'number' && 
+          ['fake', 'not_fake'].includes((v as Vote).choice as 'fake' | 'not_fake')
         )
       }
       return []
@@ -827,7 +827,7 @@ export function createStore() {
   }
 
   // Optional: auto import RSS is disabled by default; can be re-enabled via env
-  const autoImport = String((import.meta as any).env?.VITE_AUTO_IMPORT_RSS || '').toLowerCase() === 'true'
+  const autoImport = String((import.meta as ImportMeta).env?.VITE_AUTO_IMPORT_RSS || '').toLowerCase() === 'true'
   // Initialize demo votes to make half of seeds show different statuses
   if (votes.value.length === 0) {
     primeSeedStatuses()

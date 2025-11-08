@@ -119,7 +119,7 @@ function initializeApp() {
   }
   
   // 全局重置函数，可通过浏览器控制台调用
-  (window as any).resetMockData = function(options = {}) {
+  (window as Window & typeof globalThis & { resetMockData?: (options?: { regenerateNews?: boolean }) => void }).resetMockData = function(options = {}) {
     console.warn('正在重置模拟数据...')
     if (globalStore && globalStore.resetMockData) {
       try {

@@ -237,7 +237,7 @@ function getFormattedDate(node: Element): string {
  */
 function getLink(node: Element): string | undefined {
   // 尝试普通链接文本
-  let link = node.querySelector("link")?.textContent?.trim();
+  const link = node.querySelector("link")?.textContent?.trim();
   if (link) return link;
   
   // 尝试Atom格式的链接属性
