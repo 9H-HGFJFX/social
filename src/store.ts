@@ -53,7 +53,6 @@ function genVoteId(): string {
  * @returns 种子新闻数组
  */
 function createSeedNews(): InternalNews[] {
-  const total = 60
   const list: InternalNews[] = []
   const now = Date.now()
   
@@ -249,8 +248,8 @@ function createSeedNews(): InternalNews[] {
     return newsTypes[0].type // 默认返回第一种类型
   }
   
-  // 生成示例新闻数据
-  for (let i = 0; i < total; i += 1) {
+  // 减少新闻数量以提升性能
+  for (let i = 0; i < 20; i += 1) {
     const id = i + 1
     const createdAt = new Date(now - i * 3600_000).toISOString() // 按小时错开
     const newsType = getRandomNewsType()
@@ -668,8 +667,9 @@ export function createStore() {
       const n = news.value[i]
       if (!n.__seed) continue
       const makeFakeMajority = i < half
-      const fakeCount = makeFakeMajority ? 14 : 6
-      const notFakeCount = makeFakeMajority ? 6 : 14
+      // 减少投票数量以提升性能
+      const fakeCount = makeFakeMajority ? 5 : 2
+      const notFakeCount = makeFakeMajority ? 2 : 5
       for (let f = 0; f < fakeCount; f += 1) addVote({ newsId: n.id, choice: 'fake' })
       for (let nf = 0; nf < notFakeCount; nf += 1) addVote({ newsId: n.id, choice: 'not_fake' })
     }
@@ -760,16 +760,16 @@ export function createStore() {
         news.value = createSeedNews()
       }
       
-      // 重新生成种子新闻的投票状态
+      // 重新生成种子新闻的投票状态，减少数据量以提升性能
       primeSeedStatuses()
-      boostSeedVotes(18, 24)
+      boostSeedVotes(3, 8)
       randomizeEngagement({ 
-        likeMin: 5, 
-        likeMax: 60, 
-        voteMin: 8, 
-        voteMax: 24, 
-        commentRate: 0.35, 
-        imageRate: 0.12 
+        likeMin: 2, 
+        likeMax: 20, 
+        voteMin: 2, 
+        voteMax: 8, 
+        commentRate: 0.15, 
+        imageRate: 0.05 
       })
       
       // 持久化重置后的数据

@@ -1,10 +1,5 @@
 import { createRouter, createWebHashHistory, type NavigationGuardNext, type RouteLocationNormalized } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
-import Home from './pages/Home.vue'
-import NewsDetail from './pages/NewsDetail.vue'
-import Vote from './pages/Vote.vue'
-import ReportNews from './pages/ReportNews.vue'
-import ImportRSS from './pages/ImportRSS.vue'
 
 /**
  * 路由元数据接口
@@ -31,7 +26,7 @@ type CustomRouteRecordRaw = RouteRecordRaw & {
 const routes: CustomRouteRecordRaw[] = [
   {
     path: '/', 
-    component: Home,
+    component: () => import('./pages/Home.vue'),
     meta: {
       title: '首页',
       isPublic: true
@@ -39,7 +34,7 @@ const routes: CustomRouteRecordRaw[] = [
   },
   {
     path: '/news/:id', 
-    component: NewsDetail,
+    component: () => import('./pages/NewsDetail.vue'),
     meta: {
       title: '新闻详情',
       isPublic: true
@@ -51,7 +46,7 @@ const routes: CustomRouteRecordRaw[] = [
   },
   {
     path: '/news/:id/vote', 
-    component: Vote,
+    component: () => import('./pages/Vote.vue'),
     meta: {
       title: '投票',
       isPublic: true
@@ -62,7 +57,7 @@ const routes: CustomRouteRecordRaw[] = [
   },
   {
     path: '/report', 
-    component: ReportNews,
+    component: () => import('./pages/ReportNews.vue'),
     meta: {
       title: '报料',
       isPublic: true
@@ -70,7 +65,7 @@ const routes: CustomRouteRecordRaw[] = [
   },
   {
     path: '/import', 
-    component: ImportRSS,
+    component: () => import('./pages/ImportRSS.vue'),
     meta: {
       title: 'RSS导入',
       isPublic: true
