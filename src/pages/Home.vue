@@ -198,11 +198,12 @@ import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useStore, formatDate } from '../store'
 import { useI18n } from '../i18n'
+import type { News } from '../types'
 
 type Filter = 'all' | 'fake' | 'not_fake'
 type TimeFilter = 'all' | 'day' | 'week' | 'month'
 
-const { state, getStatus, getVoteCounts, clearImported, boostSeedVotes, likeNews, startProgress, finishProgress, localize } = useStore()
+const { state, getStatus, getVoteCounts, boostSeedVotes, localize } = useStore()
 const localized = (n: News) => {
   // 直接返回英文标题，绕过localize函数
   if (n.translations?.en?.title) {
@@ -366,9 +367,9 @@ const counts = computed(() => {
 
 // 本地化处理
 const localizedList = computed(() => {
-  const L = lang.value as 'zh' | 'en'
+  
   const mapped = filtered.value.map((n: any) => {
-    const x = localize(n, L)
+    const x = localize(n)
     return { ...n, title: x.title, summary: x.summary, content: x.content, reporter: x.reporter, source: x.source }
   })
   return mapped
@@ -748,6 +749,7 @@ const onImgError = (e: Event) => {
   margin: 0 0 8px 0;
   line-height: 1.4;
   display: -webkit-box;
+  line-clamp: 3;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;

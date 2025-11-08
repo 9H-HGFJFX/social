@@ -47,6 +47,7 @@ const dict = {
     backHome: "返回首页",
 
     voteResults: "投票结果：",
+    total_votes: "总投票数",
     fakeShort: "假",
     notFakeShort: "非假",
     realNews: "真实新闻",
@@ -116,6 +117,7 @@ const dict = {
     backHome: "Back to Home",
 
     voteResults: "Vote results:",
+    total_votes: "Total Votes",
     fakeShort: "Fake",
     notFakeShort: "Not Fake",
     realNews: "Real News",

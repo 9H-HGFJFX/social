@@ -133,7 +133,7 @@ const id = Number(route.params.id)
 const { state, getStatus, getVoteCounts, getComments, localize } = useStore()
 const { t, lang } = useI18n()
 const n = computed(() => state.news.find((x) => x.id === id))
-const L = computed(() => n.value ? localize(n.value, lang.value as 'zh' | 'en') : undefined)
+const L = computed(() => n.value ? localize(n.value) : undefined)
 const page = ref(1)
 const pageSize = ref(5)
 const comments = computed(() => {
