@@ -12,7 +12,7 @@
       />
     </div>
     <div class="form-group">
-      <label for="commentText">{{ t('commentText') }}:</label>
+      <label for="commentText">{{ t('yourComment') }}:</label>
       <textarea 
         id="commentText"
         v-model="commentText"
