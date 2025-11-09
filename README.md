@@ -11,8 +11,8 @@
 | Full Name       | Student ID       | 
 |-----------------|------------------|
 | [Liuxinyi]      | [20232086]       | 
-| [Member 2 Name] | [Member 2 ID]    | 
-| [Member 3 Name] | [Member 3 ID]    | 
+| [Chenda]        | [20232069]       | 
+| [liushiyuan   ] | [20232065]       | 
 
 ## Project Description
 ### 1. Project Overview
@@ -33,7 +33,7 @@ This is a Single Page Application (SPA) developed with React + TypeScript + Vite
 ## Submission Links
 - GitHub Repository Link: https://github.com/chartchai-class/project-01-anti-fakenews-cn-695
 - Deployed Website URL:  https://social-alpha-one.vercel.app/
-- Demo Video URL: [Enter the video storage link, e.g., YouTube, Google Drive, or other publicly accessible links]
+- Demo Video URL: https://redio-abeb12-en7vqueqy-lll-lls-projects.vercel.app/
 
 ## Notes
 - This project strictly adheres to course requirements: no back-end Post requests are used, and all interactions are implemented based on front-end storage.
