@@ -1,5 +1,31 @@
 <template>
   <div class="container">
+    <!-- 布局控制选项 -->
+    <!-- 布局控制选项 -->
+    <div class="layout-controls">
+      <!-- 每页新闻数量选择 -->
+      <div class="control-item">
+        <label for="pageSize">{{ t('itemsPerPage') }}:</label>
+        <select id="pageSize" v-model="pageSize" @change="onPageSizeChange" class="control-select">
+          <option :value="5">5</option>
+          <option :value="10">10</option>
+          <option :value="20">20</option>
+          <option :value="50">50</option>
+        </select>
+      </div>
+      
+      <!-- 每行显示列数选择 -->
+      <div class="control-item">
+        <label for="columns">{{ t('columnsPerRow') }}:</label>
+        <select id="columns" v-model="columns" @change="onColumnsChange" class="control-select">
+          <option :value="1">1</option>
+          <option :value="2">2</option>
+          <option :value="3">3</option>
+          <option :value="4">4</option>
+        </select>
+      </div>
+    </div>
+    
     <!-- 主布局：左侧筛选 + 右侧内容 -->
     <div class="main-layout">
       <!-- 左侧筛选栏 -->
@@ -8,15 +34,16 @@
         
         <!-- 搜索筛选 -->
         <div class="filter-module">
-          <h3 class="filter-module-title">Search</h3>
+          <h3 class="filter-module-title">{{ t('search') }}</h3>
           <div class="search-wrapper">
             <input 
               type="text" 
-              v-model="searchKeyword" 
-              placeholder="Enter keywords to search"
+              v-model="searchInputValue" 
+              :placeholder="t('searchPlaceholder')"
               class="search-input"
               @input="onSearchChange"
             />
+            <div v-if="loading" class="search-loading">⏳</div>
           </div>
         </div>
         
@@ -164,22 +191,38 @@
         <div v-if="current.length === 0" style="padding:24px; text-align:center; color:#666666">{{ t('noMatch') }}</div>
         
         <!-- 新闻列表 -->
-        <div class="news-list">
-          <RouterLink v-for="n in current" :key="n.id" :to="`/news/${n.id}`" class="news-card">
-            <!-- 假新闻角标 -->
-            <div v-if="getStatus(n.id) === 'Fake'" class="fake-badge">{{ t('fakeNews') }}</div>
-            
-            <!-- 新闻图片 -->
-            <div class="card-image">
-              <img :src="cover(n)" alt="news image" @error="onImgError($event)" />
-            </div>
-            
-            <!-- 卡片内容 -->
-            <div class="card-content">
-              <h3 class="card-title">{{ localized(n).title }}</h3>
-              <p class="card-date">{{ formatDate(n.createdAt) }}</p>
-            </div>
-          </RouterLink>
+        <div class="news-list" :class="`columns-${columns}`">
+          <div v-for="n in current" :key="n.id" class="news-card-wrapper">
+            <RouterLink :to="`/news/${n.id}`" class="news-card">
+              <!-- 假新闻角标 -->
+              <div v-if="getStatus(n.id) === 'Fake'" class="fake-badge">{{ t('fakeNews') }}</div>
+              
+              <!-- 新闻图片 -->
+              <div class="card-image">
+                <img :src="cover(n)" alt="news image" @error="onImgError($event)" />
+              </div>
+               
+              <!-- 卡片内容 -->
+              <div class="card-content">
+                <h3 class="card-title">{{ localized(n).title }}</h3>
+                <div class="card-footer">
+                  <p class="card-date">{{ formatDate(n.createdAt) }}</p>
+                  <!-- 点赞按钮 -->
+              <button 
+                class="like-button" 
+                :class="{ liked: likedNews.has(n.id) }"
+                @click="handleLike($event, n.id)"
+                :disabled="loading"
+                title="{{ t('like') }}"
+              >
+                <span v-if="loading" class="like-loading">⏳</span>
+                <span v-else class="like-icon">{{ likedNews.has(n.id) ? '❤️' : '🤍' }}</span>
+                <span class="like-count">{{ getLikes(n.id) }}</span>
+              </button>
+                </div>
+              </div>
+            </RouterLink>
+          </div>
         </div>
         
         <!-- 分页器 -->
@@ -194,7 +237,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useStore, formatDate } from '../store'
 import { useI18n } from '../i18n'
@@ -203,7 +246,7 @@ import type { News } from '../types'
 type Filter = 'all' | 'fake' | 'not_fake'
 type TimeFilter = 'all' | 'day' | 'week' | 'month'
 
-const { state, getStatus, getVoteCounts, boostSeedVotes, localize } = useStore()
+const { state, getStatus, localize, addLike, removeLike, getLikes } = useStore()
 const localized = (n: News) => {
   // 直接返回英文标题，绕过localize函数
   if (n.translations?.en?.title) {
@@ -227,12 +270,19 @@ const { t, lang } = useI18n()
 const filter = ref<Filter>('all')
 const selectedCountry = ref('all')
 const page = ref(1)
-const pageSize = ref<number>(10) // 固定每页显示10条
+const pageSize = ref<number>(10) // 用户可选择每页显示新闻数量
+const columns = ref<number>(3) // 用户可选择每行显示列数
 const timeFilter = ref<TimeFilter>('all')
 const searchKeyword = ref('')
+const searchInputValue = ref('') // 用于输入防抖的中间值
+const loading = ref(false) // 加载状态
+// 存储用户点赞状态（使用Set避免重复）
+const likedNews = ref<Set<number>>(new Set())
 // 可折叠状态
 const isCountryExpanded = ref(false)
 const isTimeExpanded = ref(false)
+// 搜索防抖定时器
+let searchDebounceTimer: number | undefined
 
 // 预定义国家列表
 const countries = ref([
@@ -310,7 +360,8 @@ const filterByKeyword = (news: any): boolean => {
   return (
     news.title.toLowerCase().includes(keyword) ||
     (news.content && news.content.toLowerCase().includes(keyword)) ||
-    (news.source && news.source.toLowerCase().includes(keyword))
+    (news.source && news.source.toLowerCase().includes(keyword)) ||
+    (news.summary && news.summary.toLowerCase().includes(keyword))
   )
 }
 
@@ -411,9 +462,18 @@ const setTimeFilter = (time: TimeFilter) => {
   timeFilter.value = time
 }
 
+// 搜索防抖函数，避免频繁触发搜索
 const onSearchChange = () => {
-  // 搜索变化时自动重置页码
-  page.value = 1
+  // 清除之前的定时器
+  if (searchDebounceTimer) {
+    clearTimeout(searchDebounceTimer)
+  }
+  
+  // 设置新的定时器
+  searchDebounceTimer = window.setTimeout(() => {
+    searchKeyword.value = searchInputValue.value
+    page.value = 1 // 搜索变化时自动重置页码
+  }, 300) // 300ms防抖延迟
 }
 
 const prev = () => {
@@ -423,6 +483,71 @@ const prev = () => {
 const next = () => {
   if (page.value < totalPages.value) page.value += 1
 }
+
+// 处理页面大小变化
+const onPageSizeChange = () => {
+  page.value = 1 // 重置到第一页
+}
+
+// 处理列数变化
+const onColumnsChange = () => {
+  // 列数变化时不需要重置页码
+}
+
+// 初始化点赞状态
+onMounted(() => {
+  initLikedNews()
+})
+
+// 新闻点赞相关功能
+  // 初始化用户点赞状态
+  const initLikedNews = () => {
+     try {
+       loading.value = true
+       const stored = localStorage.getItem('user_likes')
+       if (stored) {
+         const likes = JSON.parse(stored)
+         Object.keys(likes).forEach(id => {
+           if (likes[id]) {
+             likedNews.value.add(Number(id))
+           }
+         })
+       }
+     } catch (error) {
+       console.warn('初始化点赞状态失败:', error)
+     } finally {
+       loading.value = false
+     }
+   }
+  
+  // 处理点赞
+  const handleLike = async (event: Event, newsId: number) => {
+    event.preventDefault()
+    event.stopPropagation()
+    
+    try {
+      loading.value = true
+      
+      if (likedNews.value.has(newsId)) {
+        removeLike(newsId)
+        likedNews.value.delete(newsId)
+      } else {
+        addLike(newsId)
+        likedNews.value.add(newsId)
+      }
+      
+      // 保存点赞状态到本地存储
+      const likes: Record<number, boolean> = {}
+      likedNews.value.forEach(id => {
+        likes[id] = true
+      })
+      localStorage.setItem('user_likes', JSON.stringify(likes))
+    } catch (error) {
+      console.warn('处理点赞失败:', error)
+    } finally {
+      loading.value = false
+    }
+  }
 
 // 图片处理
 const PLACEHOLDER = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540"><rect width="100%" height="100%" fill="%23eef2f7"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="%23666" font-size="24" font-family="Arial">No Image</text></svg>'
@@ -511,8 +636,32 @@ const onImgError = (e: Event) => {
 
 /* 搜索输入框 */
 .search-wrapper {
-  margin-bottom: 16px;
-}
+    position: relative;
+    margin-bottom: 16px;
+  }
+  
+  .search-loading {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 16px;
+  }
+  
+  .like-loading {
+    display: inline-block;
+    animation: spin 1s linear infinite;
+  }
+  
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  
+  .like-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
 
 .search-input {
   width: 100%;
@@ -682,16 +831,80 @@ const onImgError = (e: Event) => {
   margin: 0;
 }
 
-/* 新闻列表 */
+/* 布局控制选项 */
+.layout-controls {
+  display: flex;
+  justify-content: flex-end;
+  gap: 20px;
+  margin-bottom: 20px;
+  padding: 12px 16px;
+  background: var(--bg-white);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.control-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.control-item label {
+  font-size: 14px;
+  color: var(--text-dark);
+  font-weight: 500;
+}
+
+.control-select {
+  padding: 6px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 14px;
+  background: var(--bg-white);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.control-select:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(22, 93, 255, 0.1);
+}
+
+/* 新闻列表 - 响应式网格布局 */
 .news-list {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
   gap: 24px;
   margin-bottom: 32px;
 }
 
+/* 根据用户选择的列数设置网格 */
+.news-list.columns-1 {
+  grid-template-columns: repeat(1, 1fr);
+}
+
+.news-list.columns-2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.news-list.columns-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.news-list.columns-4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+/* 新闻卡片包装器 */
+.news-card-wrapper {
+  position: relative;
+}
+
 /* 新闻卡片 */
 .news-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
   position: relative;
   background: var(--bg-white);
   border-radius: 8px;
@@ -739,6 +952,9 @@ const onImgError = (e: Event) => {
 
 /* 卡片内容 */
 .card-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   padding: 16px;
 }
 
@@ -756,10 +972,57 @@ const onImgError = (e: Event) => {
   text-overflow: ellipsis;
 }
 
+.card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: auto;
+}
+
 .card-date {
   font-size: 12px;
   color: var(--text-muted);
   margin: 0;
+}
+
+/* 点赞按钮 */
+.like-button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: #f0f2f5;
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-light);
+  transition: all 0.2s ease;
+  min-width: 60px;
+}
+
+.like-button:hover {
+  background: #ffebef;
+  border-color: #ff4d4f;
+  transform: translateY(-1px);
+}
+
+.like-button.liked {
+  background: #ff4d4f;
+  border-color: #ff4d4f;
+  color: white;
+}
+
+.like-button.liked:hover {
+  background: #ff7875;
+}
+
+.like-icon {
+  font-size: 14px;
+}
+
+.like-count {
+  font-weight: 500;
 }
 
 /* 分页器 */
@@ -820,13 +1083,25 @@ const onImgError = (e: Event) => {
     width: 100%;
   }
   
+  /* 在小屏幕上强制使用列数设置，而不是覆盖用户选择 */
   .news-list {
-    grid-template-columns: repeat(2, 1fr);
     gap: 20px;
+  }
+  
+  /* 仅在移动设备上覆盖用户选择 */
+  @media (max-width: 768px) {
+    .news-list {
+      grid-template-columns: repeat(1, 1fr) !important;
+    }
   }
   
   .featured-title {
     font-size: 24px;
+  }
+  
+  .layout-controls {
+    justify-content: center;
+    flex-wrap: wrap;
   }
 }
 
@@ -835,8 +1110,8 @@ const onImgError = (e: Event) => {
     padding: 15px;
   }
   
+  /* 移动设备上强制使用单列布局 */
   .news-list {
-    grid-template-columns: 1fr;
     gap: 16px;
   }
   
@@ -855,6 +1130,19 @@ const onImgError = (e: Event) => {
   .radio-group {
     max-height: 200px;
     overflow-y: auto;
+  }
+  
+  /* 优化卡片底部按钮在移动端的显示 */
+  .card-footer {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  
+  .like-button {
+    flex: 1;
+    justify-content: center;
+    font-size: 12px;
+    padding: 6px 8px;
   }
 }
 

@@ -45,17 +45,29 @@
 
     <!-- 互动区域 -->
     <div class="interaction-section">
-      <!-- 投票按钮 - 全屏宽度 -->
-      <div class="vote-buttons">
-        <RouterLink class="btn vote-true" :to="`/news/${n.id}/vote`">
-          ✅ {{ t('goVote') }}
-        </RouterLink>
-        <RouterLink class="btn vote-fake" :to="`/news/${n.id}/vote`">
-          ❌ {{ t('fakeOption') }}
-        </RouterLink>
-        <a v-if="n.link" class="btn view-original" :href="n.link" target="_blank" rel="noopener">
-          🌐 {{ t('viewOriginal') }}
-        </a>
+      <!-- 投票和点赞按钮区域 -->
+      <div class="interaction-buttons">
+        <!-- 投票按钮 - 全屏宽度 -->
+        <div class="vote-buttons">
+          <RouterLink class="btn vote-true" :to="`/news/${n.id}/vote`">
+            ✅ {{ t('goVote') }}
+          </RouterLink>
+          <RouterLink class="btn vote-fake" :to="`/news/${n.id}/vote`">
+            ❌ {{ t('fakeOption') }}
+          </RouterLink>
+          <a v-if="n.link" class="btn view-original" :href="n.link" target="_blank" rel="noopener">
+            🌐 {{ t('viewOriginal') }}
+          </a>
+        </div>
+        
+        <!-- 点赞按钮 -->
+        <button 
+          class="btn like-button" 
+          :class="{ liked: isLiked }"
+          @click="toggleLike"
+        >
+          {{ isLiked ? '❤️ ' : '🤍 ' }}{{ t(isLiked ? 'liked' : 'like') }} ({{ likesCount }})
+        </button>
       </div>
 
       <!-- 投票结果 -->
@@ -79,6 +91,12 @@
 
       <!-- 评论区 -->
       <div class="comments-section">
+        <!-- 评论表单 -->
+        <CommentForm 
+          v-if="n" 
+          :news-id="n.id" 
+          @comment-added="onCommentAdded"
+        />
         <h3 class="section-title">{{ t('commentsTitle') }}</h3>
         
         <div v-if="current.length === 0" class="no-comments">{{ t('noComments') }}</div>
@@ -97,6 +115,15 @@
             <div class="comment-content">
               <p v-if="c.comment">{{ c.comment }}</p>
               <img v-if="c.imageUrl" :src="c.imageUrl" alt="comment image" class="comment-image" />
+            </div>
+            <div class="comment-actions">
+              <button 
+                class="comment-like-btn" 
+                :class="{ liked: hasLikedComment(c.id) }"
+                @click="toggleCommentLike(c.id)"
+              >
+                👍 {{ getCommentLikeCount(c.id) }}
+              </button>
             </div>
           </div>
         </div>
@@ -123,19 +150,56 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, RouterLink } from 'vue-router'
 import { useStore, formatDate } from '../store'
 import { useI18n } from '../i18n'
+import CommentForm from '../components/CommentForm.vue'
 
 const route = useRoute()
 const id = Number(route.params.id)
-const { state, getStatus, getVoteCounts, getComments, localize } = useStore()
+const { state, getStatus, getVoteCounts, getComments, localize, addLike, removeLike, getLikes, addCommentLike, removeCommentLike, getCommentLikesCount, hasUserLikedComment } = useStore()
 const { t, lang } = useI18n()
 const n = computed(() => state.news.find((x) => x.id === id))
 const L = computed(() => n.value ? localize(n.value) : undefined)
 const page = ref(1)
 const pageSize = ref(5)
+
+// 处理新评论添加后的逻辑
+const onCommentAdded = () => {
+  page.value = 1 // 重置到第一页查看新评论
+}
+
+// 获取当前用户ID（模拟）
+const getUserId = (): string => {
+  // 在实际应用中，这应该从用户认证系统获取
+  let userId = localStorage.getItem('current_user_id')
+  if (!userId) {
+    userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
+    localStorage.setItem('current_user_id', userId)
+  }
+  return userId
+}
+
+// 切换评论点赞状态
+const toggleCommentLike = (commentId: string) => {
+  const userId = getUserId()
+  if (hasUserLikedComment(commentId, userId)) {
+    removeCommentLike(commentId, userId)
+  } else {
+    addCommentLike(commentId, userId)
+  }
+}
+
+// 获取评论点赞数
+const getCommentLikeCount = (commentId: string): number => {
+  return getCommentLikesCount(commentId)
+}
+
+// 检查当前用户是否已点赞评论
+const hasLikedComment = (commentId: string): boolean => {
+  return hasUserLikedComment(commentId, getUserId())
+}
 const comments = computed(() => {
     const cmts = getComments(id)
     return cmts.sort((a, b) => 
@@ -146,6 +210,54 @@ const totalPages = computed(() => Math.max(1, Math.ceil(comments.value.length / 
 const current = computed(() => comments.value.slice((page.value - 1) * pageSize.value, page.value * pageSize.value))
 const status = computed(() => n.value ? getStatus(n.value.id) : 'Undecided')
 const counts = computed(() => n.value ? getVoteCounts(n.value.id) : { fake:0, not_fake:0 })
+const likesCount = computed(() => n.value ? getLikes(n.value.id) : 0)
+const isLiked = ref(false)
+
+// 检查用户是否已点赞
+const checkUserLike = () => {
+  if (!n.value) return
+  try {
+    const stored = localStorage.getItem('user_likes')
+    if (stored) {
+      const userLikes = JSON.parse(stored)
+      isLiked.value = !!userLikes[n.value.id]
+    }
+  } catch (error) {
+    console.warn('检查用户点赞状态失败:', error)
+  }
+}
+
+// 切换点赞状态
+const toggleLike = () => {
+  if (!n.value) return
+  
+  try {
+    // 获取现有点赞数据
+    const stored = localStorage.getItem('user_likes')
+    const userLikes = stored ? JSON.parse(stored) : {}
+    
+    // 切换点赞状态
+    isLiked.value = !isLiked.value
+    
+    if (isLiked.value) {
+      userLikes[n.value.id] = true
+      addLike(n.value.id)
+    } else {
+      delete userLikes[n.value.id]
+      removeLike(n.value.id)
+    }
+    
+    // 保存到本地存储
+    localStorage.setItem('user_likes', JSON.stringify(userLikes))
+  } catch (error) {
+    console.warn('切换点赞状态失败:', error)
+  }
+}
+
+// 监听新闻变化，重新检查点赞状态
+watch(n, () => {
+  checkUserLike()
+}, { immediate: true })
 
 // 国家判断函数
 const getCountry = (news: any): string => {
@@ -357,6 +469,12 @@ const onImgError = (e: Event) => { (e.target as HTMLImageElement).src = PLACEHOL
   gap: 24px;
 }
 
+.interaction-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
 /* 投票按钮 */
 .vote-buttons {
   display: flex;
@@ -378,6 +496,27 @@ const onImgError = (e: Event) => { (e.target as HTMLImageElement).src = PLACEHOL
   justify-content: center;
   gap: 8px;
   min-height: 48px;
+}
+
+/* 点赞按钮样式 */
+.like-button {
+  background: #f0f2f5;
+  color: #333;
+  align-self: flex-start;
+}
+
+.like-button:hover {
+  background: #ffebef;
+  transform: translateY(-2px);
+}
+
+.like-button.liked {
+  background: #ff4d4f;
+  color: white;
+}
+
+.like-button.liked:hover {
+  background: #ff7875;
 }
 
 .vote-true {
@@ -555,6 +694,34 @@ const onImgError = (e: Event) => { (e.target as HTMLImageElement).src = PLACEHOL
   max-width: 100%;
   border-radius: 6px;
   margin-top: 8px;
+}
+
+.comment-actions {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.comment-like-btn {
+  background: none;
+  border: 1px solid #D9E1F2;
+  border-radius: 4px;
+  padding: 4px 12px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #4E5969;
+  transition: all 0.3s;
+}
+
+.comment-like-btn:hover {
+  border-color: #165DFF;
+  color: #165DFF;
+}
+
+.comment-like-btn.liked {
+  background-color: #165DFF;
+  color: white;
+  border-color: #165DFF;
 }
 
 /* 评论分页 */

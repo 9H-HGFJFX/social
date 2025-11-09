@@ -2,7 +2,8 @@
  * 新闻反假平台状态管理模块
  */
 import { inject, ref, reactive } from 'vue'
-import type { News, Vote, VoteCounts, NewsStatus, VoteChoice } from './types'
+import type { News, Vote, VoteCounts, NewsStatus, VoteChoice, CommentLike } from './types'
+import { createSeedNews, generateMockVotes, generateMockCommentLikes, type InternalNews, nextId, genVoteId } from './mockData'
 
 export const StoreSymbol = Symbol('store')
 
@@ -26,367 +27,7 @@ export const formatDate = (iso: string): string => {
   }
 }
 
-/**
- * 内部新闻类型，扩展了原始新闻类型以标记种子和导入的新闻
- */
-type InternalNews = News & { __seed?: boolean; __imported?: boolean }
 
-/**
- * 生成列表中下一个可用ID
- * @param list 包含ID属性的对象列表
- * @returns 下一个可用的ID
- */
-function nextId(list: { id: number }[]): number {
-  return list.length === 0 ? 1 : Math.max(...list.map((x) => x.id)) + 1
-}
-
-/**
- * 生成唯一的投票ID
- * @returns 随机生成的投票ID
- */
-function genVoteId(): string {
-  return Math.random().toString(36).slice(2) + Date.now().toString(36)
-}
-
-/**
- * 创建种子新闻数据
- * @returns 种子新闻数组
- */
-function createSeedNews(): InternalNews[] {
-  const list: InternalNews[] = []
-  const now = Date.now()
-  
-  // 新闻类型定义
-  const newsTypes = [
-    { type: 'politics', label: '政治', weight: 0.25 },
-    { type: 'technology', label: '科技', weight: 0.25 },
-    { type: 'culture', label: '文化', weight: 0.2 },
-    { type: 'weather', label: '天气', weight: 0.15 },
-    { type: 'economy', label: '经济', weight: 0.15 }
-  ]
-  
-  // 国内政治主题
-  const politicsDomesticSubjects = [
-    '国务院', '全国人大常委会', '中央政治局', '外交部', 
-    '最高人民法院', '最高人民检察院', '国家发改委', '财政部',
-    '公安部', '教育部', '科技部', '生态环境部',
-    '各省省政府', '香港特区政府', '澳门特区政府', '中国人民解放军'
-  ]
-  
-  // 国际政治主题
-  const politicsInternationalSubjects = [
-    '美国总统', '美国国会', '欧盟委员会', '联合国安理会',
-    '俄罗斯政府', '英国政府', '法国总统', '德国总理',
-    '日本首相', '韩国总统', '朝鲜领导人', '印度总理',
-    '中东和谈', '北约峰会', 'G20峰会', '联合国大会'
-  ]
-  
-  // 科技主题
-  const technologySubjects = [
-    '人工智能研究团队', '量子计算实验室', '航天科技集团', '新能源汽车制造商',
-    '5G技术联盟', '半导体产业', '大数据研究中心', '云计算服务提供商',
-    '元宇宙研发团队', '区块链技术公司', '生物科技实验室', '无人机研发中心',
-    '智能机器人研究小组', '可穿戴设备厂商', 'AR/VR技术公司', '绿色科技企业'
-  ]
-  
-  // 文化主题
-  const cultureSubjects = [
-    '国家博物馆', '故宫博物院', '中央芭蕾舞团', '国家话剧院',
-    '中国作家协会', '国际电影节', '世界文化遗产委员会', '传统艺术节',
-    '民族音乐团体', '现代艺术展览', '文学奖评选委员会', '考古发掘团队',
-    '非物质文化遗产保护中心', '文化交流协会', '影视制作公司', '出版集团'
-  ]
-  
-  // 天气主题
-  const weatherSubjects = [
-    '国家气象局', '中国气象局', '台风预警中心', '暴雨监测站',
-    '高温预警部门', '寒潮预报中心', '沙尘暴监测网络', '雷电防护中心',
-    '空气质量监测站', '气候变化研究中心', '防洪抗旱指挥部', '地质灾害预警系统',
-    '极端天气应急响应小组', '气象卫星中心', '农业气象服务', '城市气象研究团队'
-  ]
-  
-  // 经济主题
-  const economySubjects = [
-    '中国人民银行', '中国银保监会', '中国证监会', '财政部',
-    '国家统计局', '世界银行', '国际货币基金组织', '亚洲开发银行',
-    '大型国企', '跨国公司', '金融市场监管机构', '国际贸易组织',
-    '房地产市场研究中心', '股市分析机构', '投资银行', '经济研究智库'
-  ]
-  
-  // 动作列表 - 按类型分组
-  const actions = {
-    politics: [
-      '发布重要政策', '召开高层会议', '签署合作协议', '发表重要讲话',
-      '提出新法案', '举行外交会谈', '回应国际关切', '调整外交政策',
-      '部署重要改革', '宣布人事任命', '启动特别调查', '通过重大决议',
-      '举办国际峰会', '发布外交声明', '应对国际危机', '推动区域合作'
-    ],
-    technology: [
-      '发布重大科技成果', '研发新技术', '推出创新产品', '突破技术瓶颈',
-      '成立联合实验室', '获得重大专利', '发布行业标准', '完成技术升级',
-      '举办科技展览', '开展国际合作', '投资研发项目', '应用新技术',
-      '宣布技术路线图', '解决关键技术难题', '发布研究报告', '获得科技奖项'
-    ],
-    culture: [
-      '举办文化节', '开展国际交流', '发布艺术作品', '举行文化遗产保护活动',
-      '举办艺术节', '出版文学作品', '举办体育赛事', '进行文化产业投资',
-      '开展学术研讨', '举办国际电影展', '举办音乐会', '推出文化品牌',
-      '启动文化工程', '组织文化论坛', '举办艺术展览', '设立文化奖项'
-    ],
-    weather: [
-      '发布天气预报', '发出灾害预警', '启动应急响应', '监测极端天气',
-      '发布高温预警', '发布暴雨预警', '发布台风预警', '发布寒潮预警',
-      '评估灾害影响', '提供气象服务', '研究气候变化', '发布空气质量报告',
-      '开展气象科普', '预测天气趋势', '更新气象数据', '分析气象灾害'
-    ],
-    economy: [
-      '发布经济数据', '调整货币政策', '推出经济计划', '公布财政预算',
-      '发布行业报告', '调整利率政策', '吸引投资', '促进贸易合作',
-      '应对市场波动', '发布消费指数', '优化营商环境', '推动经济转型',
-      '评估经济形势', '推出刺激政策', '发布就业数据', '应对通胀压力'
-    ]
-  }
-  
-  // 新闻来源 - 国内外知名媒体
-  const sources = {
-    domestic: [
-      '人民日报', '新华社', '中央电视台', '光明日报',
-      '经济日报', '中国日报', '科技日报', '中国青年报',
-      '环球时报', '法制日报', '澎湃新闻', '界面新闻',
-      '财新网', '凤凰网', '南方周末', '第一财经'
-    ],
-    international: [
-      '路透社', '美联社', '法新社', '彭博社',
-      '华尔街日报', '金融时报', '纽约时报', '华盛顿邮报',
-      '卫报', '经济学人', 'BBC新闻', 'CNN',
-      'NHK', '半岛电视台', '今日俄罗斯', '亚洲新闻台'
-    ]
-  }
-  
-  // 图片类别 - 与新闻类型相关
-  const imageCategories = {
-    politics: ['government', 'leaders', 'protest', 'meeting', 'flag', 'building'],
-    technology: ['tech', 'computer', 'gadget', 'robot', 'internet', 'innovation'],
-    culture: ['art', 'music', 'theater', 'dance', 'festival', 'museum'],
-    weather: ['rain', 'snow', 'storm', 'sun', 'cloud', 'temperature'],
-    economy: ['money', 'stock', 'business', 'bank', 'trade', 'market']
-  }
-  
-  // 获取随机主题
-  const getRandomSubject = (type: string): string => {
-    switch (type) {
-      case 'politics':
-        return Math.random() < 0.6 ? 
-          politicsDomesticSubjects[Math.floor(Math.random() * politicsDomesticSubjects.length)] :
-          politicsInternationalSubjects[Math.floor(Math.random() * politicsInternationalSubjects.length)]
-      case 'technology':
-        return technologySubjects[Math.floor(Math.random() * technologySubjects.length)]
-      case 'culture':
-        return cultureSubjects[Math.floor(Math.random() * cultureSubjects.length)]
-      case 'weather':
-        return weatherSubjects[Math.floor(Math.random() * weatherSubjects.length)]
-      case 'economy':
-        return economySubjects[Math.floor(Math.random() * economySubjects.length)]
-      default:
-        return ''
-    }
-  }
-  
-  // 获取随机图片
-  const getRandomImageUrl = (type: string, id: number): string => {
-    const categories = imageCategories[type as keyof typeof imageCategories] || ['news']
-    const category = categories[Math.floor(Math.random() * categories.length)]
-    
-    // 使用与新闻类型和内容相关的图片源
-    // 这里使用不同的图片API和种子来确保图片多样性和相关性
-    const randomSeed = `${type}-${category}-${id}-${Math.floor(Math.random() * 1000)}`
-    return `https://picsum.photos/seed/${randomSeed}/960/540`
-  }
-  
-  // 获取随机来源
-  const getRandomSource = (isInternational: boolean): string => {
-    const sourcePool = isInternational ? sources.international : sources.domestic
-    return sourcePool[Math.floor(Math.random() * sourcePool.length)]
-  }
-  
-  // 内容模板 - 按新闻类型区分
-  const contentTemplates = {
-    politics: {
-      zh: (subject: string, action: string) => `${subject}近日${action}，引发国内外广泛关注。相关专家分析认为，此举将对国际关系和地区稳定产生深远影响。在记者招待会上，发言人表示将继续推进相关工作，维护国家利益和国际和平。`,
-      en: (subject: string, action: string) => `${subject} recently ${action}, attracting widespread attention both domestically and internationally. Relevant experts analyze that this move will have a profound impact on international relations and regional stability. At a press conference, the spokesperson stated that efforts will continue to advance related work and safeguard national interests and international peace.`
-    },
-    technology: {
-      zh: (subject: string, action: string) => `${subject}成功${action}，标志着相关领域取得重大突破。该技术的应用将极大提升生产效率，改善人们生活质量。研究团队表示，这一成果凝聚了多年心血，未来将继续深化研究。`,
-      en: (subject: string, action: string) => `${subject} successfully ${action}, marking a major breakthrough in related fields. The application of this technology will greatly enhance production efficiency and improve people's quality of life. The research team stated that this achievement represents years of hard work, and they will continue to deepen their research in the future.`
-    },
-    culture: {
-      zh: (subject: string, action: string) => `${subject}即将${action}，为观众带来一场文化盛宴。活动旨在弘扬传统文化，促进文化交流，增强文化自信。主办方透露，此次活动筹备已久，将呈现多个精彩节目。`,
-      en: (subject: string, action: string) => `${subject} will soon ${action}, bringing a cultural feast to the audience. The event aims to promote traditional culture, facilitate cultural exchanges, and enhance cultural confidence. Organizers revealed that this event has been in preparation for a long time and will feature several wonderful performances.`
-    },
-    weather: {
-      zh: (subject: string, action: string) => `${subject}今日${action}，提醒市民注意防范。预计未来几天天气将持续变化，相关部门已启动应急预案。气象专家建议，公众应密切关注天气变化，做好防护措施。`,
-      en: (subject: string, action: string) => `${subject} today ${action}, reminding citizens to take precautions. Weather is expected to continue changing in the next few days, and relevant departments have activated emergency plans. Meteorological experts suggest that the public should pay close attention to weather changes and take protective measures.`
-    },
-    economy: {
-      zh: (subject: string, action: string) => `${subject}最新${action}显示，经济运行总体平稳向好。分析指出，多项经济指标出现积极变化，市场信心逐步恢复。业内人士预计，未来经济增长将保持韧性，为高质量发展奠定基础。`,
-      en: (subject: string, action: string) => `${subject}'s latest ${action} shows that the overall economic operation is stable and improving. Analysis points out that multiple economic indicators have shown positive changes, and market confidence is gradually recovering. Industry insiders expect economic growth to remain resilient in the future, laying a foundation for high-quality development.`
-    }
-  }
-  
-  // 按权重随机选择新闻类型
-  const getRandomNewsType = () => {
-    const r = Math.random()
-    let cumulativeWeight = 0
-    
-    for (const type of newsTypes) {
-      cumulativeWeight += type.weight
-      if (r < cumulativeWeight) {
-        return type.type
-      }
-    }
-    
-    return newsTypes[0].type // 默认返回第一种类型
-  }
-  
-  // 减少新闻数量以提升性能
-  for (let i = 0; i < 20; i += 1) {
-    const id = i + 1
-    const createdAt = new Date(now - i * 3600_000).toISOString() // 按小时错开
-    const newsType = getRandomNewsType()
-    const isInternational = newsType === 'politics' && Math.random() > 0.4
-    
-    // 获取主题、动作和模板
-    const sbj = getRandomSubject(newsType)
-    const typeActions = actions[newsType as keyof typeof actions]
-    const act = typeActions[Math.floor(Math.random() * typeActions.length)]
-    const template = contentTemplates[newsType as keyof typeof contentTemplates]
-    
-    // 英文内容
-    const enSubject = translateSubjectToEnglish(sbj)
-    const enAction = translateActionToEnglish(act)
-    const enTitle = `${enSubject} ${enAction}`
-    const enSummary = `${enSubject} ${enAction}. This development has significant implications for various sectors.`
-    const enContent = template.en(enSubject, enAction)
-    const enReporter = `Reporter ${String.fromCharCode(65 + (i % 26))}`
-    
-    // 中文内容 (完全移除未使用的变量)
-    // 移除所有未使用的中文内容变量
-    // const zhTitle = enTitle
-    // const zhSummary = `${sbj}${act}，引发社会各界广泛关注。`
-    // const zhContent = template.zh(sbj, act)
-    
-    // 获取来源和图片
-    const source = getRandomSource(isInternational)
-    const imageUrl = getRandomImageUrl(newsType, id)
-    
-    list.push({
-      id,
-      title: enTitle, // 直接使用英文标题作为主标题
-      summary: enSummary, // 直接使用英文摘要
-      content: enContent, // 直接使用英文内容
-      reporter: enReporter, // 直接使用英文记者名
-      createdAt,
-      imageUrl,
-      source: translateSourceToEnglish(source), // 直接使用英文来源
-      link: `https://example.com/news/${id}`,
-      translations: { 
-        en: { 
-          title: enTitle, 
-          summary: enSummary, 
-          content: enContent, 
-          reporter: enReporter, 
-          source: translateSourceToEnglish(source) 
-        } 
-      },
-      __seed: true,
-    })
-  }
-  
-  return list
-}
-
-// 辅助函数：将中文主题翻译为英文
-function translateSubjectToEnglish(subject: string): string {
-  const translations: Record<string, string> = {
-    '市政府': 'City Government',
-    '国家发改委': 'National Development and Reform Commission',
-    '科技巨头': 'Tech Giant',
-    '研究团队': 'Research Team',
-    '市公安局': 'City Police Bureau',
-    '卫生健康委员会': 'Health Commission',
-    '教育局': 'Education Bureau',
-    '中央银行': 'Central Bank',
-    '气象局': 'Meteorological Bureau',
-    '国家足球队': 'National Football Team',
-    '能源公司': 'Energy Company',
-    '交通运输部': 'Ministry of Transport',
-    '北京大学': 'Peking University',
-    '旅游局': 'Tourism Bureau',
-    '房地产市场': 'Real Estate Market',
-    '环保组织': 'Environmental Organization',
-    '食品监督局': 'Food Supervision Bureau',
-    '创业公司': 'Startup Company',
-    '电商平台': 'E-commerce Platform',
-    '三甲医院': 'Top Hospital',
-    '社区委员会': 'Community Committee',
-    '国际机场': 'International Airport',
-    '高铁集团': 'High-Speed Railway Group',
-    '电信运营商': 'Telecom Operator',
-    '农业农村部': 'Ministry of Agriculture and Rural Affairs'
-  }
-  return translations[subject] || subject
-}
-
-// 辅助函数：将中文动作翻译为英文
-function translateActionToEnglish(action: string): string {
-  const translations: Record<string, string> = {
-    '发布重要政策': 'Releases Important Policy',
-    '启动紧急预案': 'Activates Emergency Plan',
-    '遭遇网络攻击': 'Suffers Cyber Attack',
-    '宣布重大投资': 'Announces Major Investment',
-    '开展专项调查': 'Launches Special Investigation',
-    '发布研究报告': 'Releases Research Report',
-    '调整收费标准': 'Adjusts Fee Standards',
-    '通过年度预算': 'Approves Annual Budget',
-    '回应社会关切': 'Responds to Public Concerns',
-    '召回问题产品': 'Recalls Defective Products',
-    '举行抗议活动': 'Holds Protest Activities',
-    '报告系统故障': 'Reports System Failure',
-    '更新行业规范': 'Updates Industry Standards',
-    '暂停服务升级': 'Suspends Service Upgrade',
-    '调整价格策略': 'Adjusts Pricing Strategy',
-    '降低贷款利率': 'Lowers Loan Interest Rates',
-    '扩大援助计划': 'Expands Assistance Program',
-    '面临法律诉讼': 'Faces Legal Lawsuit',
-    '获得融资支持': 'Secures Financing Support',
-    '提醒防范诈骗': 'Warns Against Frauds',
-    '推动改革创新': 'Promotes Reform and Innovation',
-    '迎来需求高峰': 'Experiences Demand Peak',
-    '遭遇业绩下滑': 'Experiences Performance Decline',
-    '创造营收记录': 'Creates Revenue Record',
-    '测试新系统': 'Tests New System'
-  }
-  return translations[action] || action
-}
-
-// 辅助函数：将中文新闻来源翻译为英文
-function translateSourceToEnglish(source: string): string {
-  const translations: Record<string, string> = {
-    '人民日报': 'People\'s Daily',
-    '新华社': 'Xinhua News Agency',
-    '中央电视台': 'CCTV',
-    '澎湃新闻': 'The Paper',
-    '健康时报': 'Health Times',
-    '财经日报': 'Financial Daily',
-    '环境观察': 'Environmental Observer',
-    '科技日报': 'Science and Technology Daily',
-    '中国青年报': 'China Youth Daily',
-    '环球时报': 'Global Times',
-    '法制日报': 'Legal Daily',
-    '经济观察报': 'Economic Observer'
-  }
-  return translations[source] || source
-}
 
 /**
  * 创建全局状态管理实例
@@ -397,51 +38,133 @@ export function createStore() {
   const news = ref<InternalNews[]>(createSeedNews())
   
   /**
-   * 从本地存储初始化投票数据
-   * @returns 验证后的投票数组
-   */
+ * 从本地存储初始化投票数据，当本地存储为空时使用模拟数据
+ */
   const initVotes = (): Vote[] => {
     try {
       const raw = localStorage.getItem('votes')
-      const parsed = raw ? JSON.parse(raw) as Vote[] : []
       
-      // 数据验证：确保数组元素包含必要字段
-      if (Array.isArray(parsed)) {
-        return parsed.filter((v) => 
-          typeof (v as Vote).newsId === 'number' && 
-          ['fake', 'not_fake'].includes((v as Vote).choice as 'fake' | 'not_fake')
-        )
+      // 如果有本地存储数据，使用它
+      if (raw) {
+        const parsed = JSON.parse(raw) as Vote[]
+        
+        // 数据验证：确保数组元素包含必要字段
+        if (Array.isArray(parsed)) {
+          return parsed.filter((v) => 
+            typeof (v as Vote).newsId === 'number' && 
+            ['fake', 'not_fake'].includes((v as Vote).choice as 'fake' | 'not_fake')
+          )
+        }
       }
-      return []
+      
+      // 如果没有本地存储数据或解析失败，生成模拟投票数据
+      const newsIds = news.value.map(n => n.id)
+      const mockVotes = generateMockVotes(newsIds, 8) // 每条新闻生成更多投票数据以丰富展示
+      
+      // 保存到本地存储
+      localStorage.setItem('votes', JSON.stringify(mockVotes))
+      
+      return mockVotes
     } catch (error) {
-      console.warn('初始化投票数据失败:', error)
-      return []
+      console.warn('初始化投票数据失败，使用模拟数据:', error)
+      
+      // 出错时也使用模拟数据
+      const newsIds = news.value.map(n => n.id)
+      return generateMockVotes(newsIds, 8)
     }
   }
   
   const votes = ref<Vote[]>(initVotes())
   
   /**
-   * 从本地存储初始化点赞数据
-   * @returns 点赞记录对象
-   */
+ * 从本地存储初始化点赞数据，当本地存储为空时为每条新闻生成随机点赞数
+ */
   const initLikes = (): Record<number, number> => {
     try {
       const raw = localStorage.getItem('likes_by_news')
-      const parsed = raw ? JSON.parse(raw) : {}
       
-      // 确保返回有效的记录对象
-      if (typeof parsed === 'object' && parsed !== null) {
-        return parsed
+      // 如果有本地存储数据，使用它
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        
+        // 确保返回有效的记录对象
+        if (typeof parsed === 'object' && parsed !== null) {
+          return parsed
+        }
       }
-      return {}
+      
+      // 如果没有本地存储数据或解析失败，为每条新闻生成随机点赞数
+      const mockLikes: Record<number, number> = {}
+      news.value.forEach(newsItem => {
+        // 为每条新闻生成5-30个随机点赞数
+        mockLikes[newsItem.id] = Math.floor(Math.random() * 26) + 5
+      })
+      
+      // 保存到本地存储
+      localStorage.setItem('likes_by_news', JSON.stringify(mockLikes))
+      
+      return mockLikes
     } catch (error) {
-      console.warn('初始化点赞数据失败:', error)
-      return {}
+      console.warn('初始化点赞数据失败，使用模拟数据:', error)
+      
+      // 出错时也使用模拟数据
+      const mockLikes: Record<number, number> = {}
+      news.value.forEach(newsItem => {
+        mockLikes[newsItem.id] = Math.floor(Math.random() * 26) + 5
+      })
+      
+      return mockLikes
     }
   }
   
   const likesByNews = ref<Record<number, number>>(initLikes())
+  
+  /**
+ * 从本地存储初始化评论点赞数据，当本地存储为空时使用模拟数据
+ */
+  const initCommentLikes = (): CommentLike[] => {
+    try {
+      const raw = localStorage.getItem('comment_likes')
+      
+      // 如果有本地存储数据，使用它
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        
+        // 数据验证
+        if (Array.isArray(parsed)) {
+          return parsed.filter((like: any) => 
+            typeof like.commentId === 'string' && 
+            typeof like.userId === 'string' &&
+            typeof like.createdAt === 'string'
+          )
+        }
+      }
+      
+      // 如果没有本地存储数据或解析失败，从现有投票中提取评论ID并生成模拟点赞
+      const commentIds = votes.value
+        .filter(vote => vote.comment) // 只处理有评论的投票
+        .map(vote => vote.id.toString()) // 使用投票ID作为评论ID
+      
+      const mockCommentLikes = generateMockCommentLikes(commentIds)
+      
+      // 保存到本地存储
+      localStorage.setItem('comment_likes', JSON.stringify(mockCommentLikes))
+      
+      return mockCommentLikes
+    } catch (error) {
+      console.warn('初始化评论点赞数据失败，使用模拟数据:', error)
+      
+      // 出错时也使用模拟数据
+      const commentIds = votes.value
+        .filter(vote => vote.comment)
+        .map(vote => vote.id.toString())
+      
+      return generateMockCommentLikes(commentIds)
+    }
+  }
+
+  
+  const commentLikes = ref<CommentLike[]>(initCommentLikes())
 
   // 全局进度条状态
   const progressActive = ref(false)
@@ -489,6 +212,17 @@ export function createStore() {
       localStorage.setItem('likes_by_news', JSON.stringify(likesByNews.value))
     } catch (error) {
       console.warn('持久化点赞数据失败:', error)
+    }
+  }
+  
+  /**
+   * 将评论点赞数据持久化到本地存储
+   */
+  const persistCommentLikes = (): void => {
+    try {
+      localStorage.setItem('comment_likes', JSON.stringify(commentLikes.value))
+    } catch (error) {
+      console.warn('持久化评论点赞数据失败:', error)
     }
   }
   
@@ -579,16 +313,17 @@ export function createStore() {
    * @returns 投票计数对象
    */
   const getVoteCounts = (newsId: number): VoteCounts => {
-    let fake = 0, not_fake = 0
+    let fake = 0, not_fake = 0, undecided = 0
     
     for (const v of votes.value) {
       if (v.newsId !== newsId) continue
       
       if (v.choice === 'fake') fake += 1
       else if (v.choice === 'not_fake') not_fake += 1
+      else if (v.choice === 'undecided') undecided += 1
     }
     
-    return { fake, not_fake }
+    return { fake, not_fake, undecided }
   }
 
   /**
@@ -724,14 +459,17 @@ export function createStore() {
       news.value = []
       votes.value = []
       likesByNews.value = {}
+      commentLikes.value = []
       persistVotes()
       persistLikes()
+      persistCommentLikes()
     } catch (error) {
       console.warn('删除所有新闻失败:', error)
       // 重置到安全状态
       news.value = []
       votes.value = []
       likesByNews.value = {}
+      commentLikes.value = []
     }
   }
   
@@ -750,9 +488,15 @@ export function createStore() {
         console.log('已生成新的新闻内容')
       }
       
-      // 清空投票和点赞数据
+      // 重置本地存储
+      localStorage.removeItem('votes')
+      localStorage.removeItem('likes_by_news')
+      localStorage.removeItem('comment_likes')
+      
+      // 重置状态
       votes.value = []
       likesByNews.value = {}
+      commentLikes.value = []
       
       // 确保有足够的新闻数据用于测试
       if (news.value.length < 60) {
@@ -760,21 +504,28 @@ export function createStore() {
         news.value = createSeedNews()
       }
       
-      // 重新生成种子新闻的投票状态，减少数据量以提升性能
-      primeSeedStatuses()
-      boostSeedVotes(3, 8)
-      randomizeEngagement({ 
-        likeMin: 2, 
-        likeMax: 20, 
-        voteMin: 2, 
-        voteMax: 8, 
-        commentRate: 0.15, 
-        imageRate: 0.05 
+      // 初始化模拟数据 - 使用从mockData导入的函数
+      const newsIds = news.value.map(n => n.id)
+      
+      // 生成模拟投票数据
+      votes.value = generateMockVotes(newsIds, 12) // 每条新闻12个投票
+      
+      // 为所有新闻生成随机点赞数（5-30个）
+      news.value.forEach(newsItem => {
+        likesByNews.value[newsItem.id] = Math.floor(Math.random() * 26) + 5
       })
+      
+      // 从生成的投票中提取评论ID并生成评论点赞数据
+      const commentIds = votes.value
+        .filter(vote => vote.comment)
+        .map(vote => vote.id.toString())
+      
+      commentLikes.value = generateMockCommentLikes(commentIds)
       
       // 持久化重置后的数据
       persistVotes()
       persistLikes()
+      persistCommentLikes()
       
       console.log('模拟数据已成功重置' + (regenerateNews ? '，并生成了新的新闻内容' : '，新闻内容保持不变'))
     } catch (error) {
@@ -828,32 +579,129 @@ export function createStore() {
 
   // Optional: auto import RSS is disabled by default; can be re-enabled via env
   const autoImport = String((import.meta as ImportMeta).env?.VITE_AUTO_IMPORT_RSS || '').toLowerCase() === 'true'
-  // Initialize demo votes to make half of seeds show different statuses
-  if (votes.value.length === 0) {
-    primeSeedStatuses()
-    // Optional randomization to vary counts
-    boostSeedVotes(18, 24)
-    // Auto random engagement only when no prior votes
-    randomizeEngagement({ likeMin: 5, likeMax: 60, voteMin: 8, voteMax: 24, commentRate: 0.35, imageRate: 0.12 })
-  }
-  // Ensure homepage shows random likes when none exist (without adding votes/comments)
-  const hasAnyLikes = () => Object.values(likesByNews.value).some((x) => (typeof x === 'number') && x > 0)
-  if (!hasAnyLikes()) {
-    randomizeEngagement({ likeMin: 5, likeMax: 60, voteMin: 0, voteMax: 0, commentRate: 0, imageRate: 0 })
-  }
+  
+  // 确保始终初始化足够的数据，不仅在votes为空时
+  // 先清空现有数据以确保一致的初始化
+  votes.value = []
+  likesByNews.value = []
+  
+  // 重新生成种子新闻的投票状态
+  primeSeedStatuses()
+  
+  // 为所有新闻生成丰富的互动数据，包括更多评论
+  randomizeEngagement({
+    likeMin: 10,    // 增加点赞数最小值
+    likeMax: 80,    // 增加点赞数最大值
+    voteMin: 15,    // 增加投票数最小值
+    voteMax: 40,    // 增加投票数最大值
+    commentRate: 0.5, // 提高评论率至50%
+    imageRate: 0.2   // 提高图片评论率至20%
+  })
+  
   if (autoImport) {
-    // Intentionally left as a no-op here to avoid网络错误日志; manual import page handles RSS
+    // Intentionally left as a no-op here to avoid network error logs; manual import page handles RSS
   }
 
-  // 为种子新闻添加初始投票，使其看起来更真实
-  boostSeedVotes(5, 15)
-
+  // 为评论添加点赞
+  const addCommentLike = (commentId: string, userId: string): void => {
+    try {
+      // 检查是否已经点赞
+      const existingLike = commentLikes.value.find(
+        like => like.commentId === commentId && like.userId === userId
+      )
+      
+      if (!existingLike) {
+        const like: CommentLike = {
+          commentId,
+          userId,
+          createdAt: new Date().toISOString()
+        }
+        commentLikes.value.push(like)
+        persistCommentLikes()
+      }
+    } catch (error) {
+      console.warn('添加评论点赞失败:', error)
+    }
+  }
+  
+  // 取消评论点赞
+  const removeCommentLike = (commentId: string, userId: string): void => {
+    try {
+      const index = commentLikes.value.findIndex(
+        like => like.commentId === commentId && like.userId === userId
+      )
+      
+      if (index !== -1) {
+        commentLikes.value.splice(index, 1)
+        persistCommentLikes()
+      }
+    } catch (error) {
+      console.warn('取消评论点赞失败:', error)
+    }
+  }
+  
+  // 获取评论的点赞数
+  const getCommentLikesCount = (commentId: string): number => {
+    return commentLikes.value.filter(like => like.commentId === commentId).length
+  }
+  
+  // 检查用户是否已点赞评论
+  const hasUserLikedComment = (commentId: string, userId: string): boolean => {
+    return commentLikes.value.some(
+      like => like.commentId === commentId && like.userId === userId
+    )
+  }
+  
+  // 获取数据统计信息
+  const getStatistics = () => {
+    const totalNews = news.value.length
+    const totalVotes = votes.value.length
+    const totalComments = votes.value.filter(v => v.comment || v.imageUrl).length
+    const totalNewsLikes = Object.values(likesByNews.value).reduce((sum, count) => sum + count, 0)
+    const totalCommentLikes = commentLikes.value.length
+    
+    // 按新闻类型统计
+    const newsByStatus: Record<NewsStatus, number> = {
+      'Fake': 0,
+      'Not Fake': 0,
+      'Undecided': 0
+    }
+    
+    news.value.forEach(n => {
+      const status = getStatus(n.id)
+      newsByStatus[status]++
+    })
+    
+    // 统计热门新闻（点赞数最多的前5个）
+    const hotNews = news.value
+      .map(n => ({
+        id: n.id,
+        title: n.title,
+        likes: getLikes(n.id),
+        comments: getComments(n.id).length
+      }))
+      .sort((a, b) => b.likes - a.likes)
+      .slice(0, 5)
+    
+    return {
+      totalNews,
+      totalVotes,
+      totalComments,
+      totalNewsLikes,
+      totalCommentLikes,
+      newsByStatus,
+      hotNews,
+      commentLikeRatio: totalComments > 0 ? (totalCommentLikes / totalComments) : 0
+    }
+  }
+  
   // 创建统一的状态对象，便于管理和访问
   const state = reactive({
     // 计算属性形式的getter，确保返回正确的响应式数据
     get news() { return news.value as News[] },
     get votes() { return votes.value },
     get likesByNews() { return likesByNews.value },
+    get commentLikes() { return commentLikes.value },
     get progressActive() { return progressActive.value },
     get progressValue() { return progressValue.value }
   })
@@ -878,12 +726,17 @@ export function createStore() {
     removeAllNews,
     addLike,
     removeLike,
+    addCommentLike,
+    removeCommentLike,
     
     // 查询方法
     getVoteCounts,
     getStatus,
     getComments,
     getLikes,
+    getCommentLikesCount,
+    hasUserLikedComment,
+    getStatistics,
     
     // 工具方法
     startProgress,

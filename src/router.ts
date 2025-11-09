@@ -1,5 +1,7 @@
 import { createRouter, createWebHashHistory, type NavigationGuardNext, type RouteLocationNormalized } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
+// 导入页面组件
+import Statistics from './pages/Statistics.vue'
 
 /**
  * 路由元数据接口
@@ -29,6 +31,15 @@ const routes: CustomRouteRecordRaw[] = [
     component: () => import('./pages/Home.vue'),
     meta: {
       title: '首页',
+      isPublic: true
+    }
+  },
+  {
+    path: '/statistics',
+    name: 'statistics',
+    component: Statistics,
+    meta: {
+      title: '数据统计',
       isPublic: true
     }
   },

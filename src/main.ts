@@ -5,6 +5,7 @@ import './App.css'
 import router from './router'
 import { createStore, StoreSymbol } from './store'
 import { createI18n, I18nSymbol } from './i18n'
+// import { notificationPlugin } from './services/notificationService'
 
 // 全局变量用于存储store实例
 let globalStore: ReturnType<typeof createStore> | null = null
@@ -86,6 +87,7 @@ function initializeApp() {
 
     // Register plugins
     app.use(router)
+    // app.use(notificationPlugin)
 
     // Mount application
     app.mount('#app')

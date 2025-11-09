@@ -1,4 +1,4 @@
-export type VoteChoice = "fake" | "not_fake";
+export type VoteChoice = 'fake' | 'not_fake' | 'undecided';
 
 export interface News {
   id: number;
@@ -32,8 +32,18 @@ export interface Vote {
 }
 
 export interface VoteCounts {
-  fake: number;
-  not_fake: number;
+  not_fake: number
+  fake: number
+  undecided: number
 }
 
-export type NewsStatus = "Fake" | "Not Fake" | "Undecided";
+export type NewsStatus = 'Fake' | 'Not Fake' | 'Undecided';
+
+/**
+ * 评论点赞记录
+ */
+export interface CommentLike {
+  commentId: string
+  userId: string
+  createdAt: string
+}
